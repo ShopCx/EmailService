@@ -1,5 +1,4 @@
 from django.urls import path
-from django.conf.urls import url
 from . import views
 
 urlpatterns = [
@@ -12,5 +11,4 @@ urlpatterns = [
     path('templates/search', views.search_templates, name='search_templates'),
     path('user/settings', views.manage_user_settings, name='manage_user_settings'),
     path('user/permissions', views.update_user_permissions, name='update_user_permissions'),
-    url(r'^metadata/search/$', views.search_email_metadata, name='search_email_metadata'),
 ] 
