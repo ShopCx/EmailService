@@ -34,9 +34,14 @@ class UserEmailSettings(models.Model):
 
 class EmailMetadata(models.Model):
     email = models.ForeignKey(EmailLog, on_delete=models.CASCADE)
-    metadata = JSONField(default=dict)  # Stores email metadata as JSON
+    metadata = JSONField(default=dict, db_index=True)  # Added db_index=True to ensure proper indexing
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        # Ensure we're using the correct database engine
+        managed = True
+        db_table = 'email_app_emailmetadata'
 
     def __str__(self):
         return f"Metadata for {self.email.subject}" 

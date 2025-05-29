@@ -277,28 +277,51 @@ def update_user_permissions(request):
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 
+@csrf_exempt
+@require_http_methods(["GET"])
 def search_email_metadata(request):
     """
     Vulnerable endpoint that allows SQL injection through JSONField key lookups.
     The vulnerability exists because user input is directly used as a key in the filter query.
+    
+    Example attack:
+    GET /metadata/search/?key=OR 1=1--&value=anything
+    This will generate: EmailMetadata.objects.filter(**{"metadata__OR 1=1--": "anything"})
     """
     try:
         # Get the search key and value from request
         search_key = request.GET.get('key', '')
         search_value = request.GET.get('value', '')
 
+        # Create test data if none exists (for demonstration)
+        if not EmailMetadata.objects.exists():
+            test_email = EmailLog.objects.create(
+                to_email='test@example.com',
+                subject='Test Email',
+                message='Test message',
+                status='sent'
+            )
+            EmailMetadata.objects.create(
+                email=test_email,
+                metadata={'priority': 'high', 'category': 'test'}
+            )
+
         # Vulnerable code: Using user input directly in filter query
         # This allows SQL injection through the key name
-        results = EmailMetadata.objects.filter(**{f"metadata__{search_key}": search_value})
+        filter_dict = {f"metadata__{search_key}": search_value}
+        print(f"Generated filter dict: {filter_dict}")  # Debug output
+        results = EmailMetadata.objects.filter(**filter_dict)
 
         # Return results
         return JsonResponse({
             'status': 'success',
+            'filter_used': str(filter_dict),  # Expose the filter for debugging
             'results': list(results.values('email__subject', 'metadata', 'created_at'))
         })
     except Exception as e:
         # Information disclosure vulnerability (intentionally insecure)
         return JsonResponse({
             'status': 'error',
-            'message': str(e)
+            'message': str(e),
+            'filter_attempted': str(filter_dict) if 'filter_dict' in locals() else None
         }, status=500) 
