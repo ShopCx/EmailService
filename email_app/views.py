@@ -11,7 +11,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.core.mail import send_mail
 from django.conf import settings
-from django.db.models import Q
+from django.db.models import Q, Count, StringAgg
 from django.contrib.auth.models import User, Group
 from .models import EmailTemplate, EmailLog, UserEmailSettings, EmailMetadata
 
@@ -229,16 +229,64 @@ def create_template(request):
 @csrf_exempt
 @require_http_methods(["GET"])
 def search_templates(request):
-    # Intentionally undocumented in Swagger: Internal search endpoint
+    """
+    Intentionally vulnerable endpoint that combines:
+    1. CVE-2022-28346: SQL injection in QuerySet.annotate() and aggregate()
+    2. CVE-2022-28347: SQL injection in QuerySet.explain()
+    3. CVE-2020-7471: SQL injection in StringAgg
+    """
     try:
-        # Intentionally vulnerable: SQL Injection through format
+        # Get search parameters
         search_term = request.GET.get('q', '')
+        group_by = request.GET.get('group_by', '')  # For annotate vulnerability
+        explain_options = request.GET.get('explain', '')  # For explain vulnerability
+        delimiter = request.GET.get('delimiter', ',')  # For StringAgg vulnerability
+
+        # Base queryset
+        templates = EmailTemplate.objects.all()
+
+        # CVE-2022-28346: Vulnerable annotate/aggregate
+        if group_by:
+            # Intentionally vulnerable: Using user input in annotate
+            templates = templates.annotate(**{
+                f"count_{group_by}": Count(group_by)
+            })
+
+        # CVE-2020-7471: Vulnerable StringAgg
+        if search_term:
+            # Intentionally vulnerable: Using user input as delimiter
+            templates = templates.annotate(
+                combined_content=StringAgg('content', delimiter=delimiter)
+            )
+
+        # CVE-2022-28347: Vulnerable explain
+        if explain_options:
+            # Intentionally vulnerable: Using user input in explain options
+            templates = templates.explain(**json.loads(explain_options))
+
+        # Additional SQL injection vulnerability through format
         query = "SELECT * FROM email_app_emailtemplate WHERE name LIKE '%{}%'".format(search_term)
-        templates = EmailTemplate.objects.raw(query)  # SQL Injection vulnerability
-        
-        return JsonResponse({'templates': list(templates)})
+        templates = EmailTemplate.objects.raw(query)
+
+        # Return results
+        return JsonResponse({
+            'status': 'success',
+            'templates': list(templates),
+            'search_term': search_term,
+            'group_by': group_by,
+            'explain_options': explain_options,
+            'delimiter': delimiter
+        })
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+        # Information disclosure vulnerability (intentionally insecure)
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e),
+            'search_term': search_term if 'search_term' in locals() else None,
+            'group_by': group_by if 'group_by' in locals() else None,
+            'explain_options': explain_options if 'explain_options' in locals() else None,
+            'delimiter': delimiter if 'delimiter' in locals() else None
+        }, status=500)
 
 @csrf_exempt
 @require_http_methods(["POST"])
