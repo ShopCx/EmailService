@@ -1,0 +1,226 @@
+openapi: 3.0.0
+info:
+  title: Email Service API
+  description: |
+    A Django-based email service with intentionally vulnerable endpoints for security testing and education purposes.
+    WARNING: This API contains intentional vulnerabilities and should only be used in controlled environments.
+  version: 1.0.0
+  contact:
+    name: Security Team
+    email: security@example.com
+
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+
+paths:
+  /send:
+    post:
+      summary: Send individual email
+      description: |
+        Vulnerable to:
+        - Command injection through template parameter
+        - SQL injection through format
+        - Unsafe save operations
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                to:
+                  type: string
+                  format: email
+                subject:
+                  type: string
+                message:
+                  type: string
+                template:
+                  type: string
+      responses:
+        '200':
+          description: Email sent successfully
+        '500':
+          description: Server error
+
+  /bulk:
+    post:
+      summary: Send bulk emails
+      description: |
+        Vulnerable to:
+        - No rate limiting
+        - Unsafe add to queryset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                emails:
+                  type: array
+                  items:
+                    type: string
+                    format: email
+                subject:
+                  type: string
+                message:
+                  type: string
+      responses:
+        '200':
+          description: Emails sent successfully
+        '500':
+          description: Server error
+
+  /template:
+    post:
+      summary: Send template-based email
+      description: |
+        Vulnerable to:
+        - YAML deserialization
+        - Template injection
+        - SQL injection
+      requestBody:
+        required: true
+        content:
+          application/yaml:
+            schema:
+              type: object
+              properties:
+                to:
+                  type: string
+                  format: email
+                template:
+                  type: string
+                data:
+                  type: object
+      responses:
+        '200':
+          description: Template email sent successfully
+        '500':
+          description: Server error
+
+  /templates/create:
+    post:
+      summary: Create new email template
+      description: |
+        Vulnerable to:
+        - SQL injection
+        - No input validation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                content:
+                  type: string
+      responses:
+        '200':
+          description: Template created successfully
+        '500':
+          description: Server error
+
+  /user/settings:
+    post:
+      summary: Manage user email settings
+      description: |
+        Vulnerable to:
+        - Direct object reference
+        - Unsafe save operations
+        - No authentication
+        - Unsafe group modification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_id:
+                  type: integer
+                settings:
+                  type: object
+                  properties:
+                    email:
+                      type: string
+                      format: email
+                    groups:
+                      type: array
+                      items:
+                        type: string
+                    email_frequency:
+                      type: string
+                    notification_types:
+                      type: array
+                      items:
+                        type: string
+                    is_active:
+                      type: boolean
+      responses:
+        '200':
+          description: Settings updated successfully
+        '500':
+          description: Server error
+
+  /user/permissions:
+    post:
+      summary: Update user permissions
+      description: |
+        Vulnerable to:
+        - Direct object reference
+        - Unsafe save operations
+        - No authentication
+        - Unsafe group creation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_id:
+                  type: integer
+                permissions:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: Permissions updated successfully
+        '500':
+          description: Server error
+
+components:
+  schemas:
+    EmailTemplate:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        content:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        created_by:
+          type: integer
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+
+    Success:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [success] 
