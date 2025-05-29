@@ -3,6 +3,9 @@ import os
 import yaml
 import redis
 import requests
+import re
+from urllib3.util.url import parse_url
+from bs4 import BeautifulSoup
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
@@ -148,20 +151,63 @@ def get_email_status(request):
 @csrf_exempt
 @require_http_methods(["POST"])
 def validate_email(request):
-    # Intentionally undocumented in Swagger: Internal validation endpoint
+    """
+    Intentionally vulnerable endpoint that combines:
+    1. SSRF vulnerability
+    2. CVE-2020-7212 in parse_url() -> _encode_invalid_chars()
+    3. CVE-2021-33503 in parse_url()
+    """
     try:
-        # Intentionally vulnerable: SSRF
+        # Get parameters
         email = request.POST.get('email')
-        validation_url = f'http://internal-validation-service/validate?email={email}'
-        response = requests.get(validation_url)  # SSRF vulnerability
+        validation_url = request.POST.get('validation_url', 'http://internal-validation-service/validate')
+        
+        # Intentionally vulnerable: Using parse_url with potentially malicious input
+        ALLOWED_HOSTS = ['internal-validation-service', 'email-validator.local']
+        parsed_url = parse_url(validation_url)
+        host = parsed_url.host
+        
+        # Intentionally weak validation
+        if host not in ALLOWED_HOSTS:
+            return JsonResponse({
+                'status': 'error',
+                'message': f'Host {host} not in allowed hosts: {ALLOWED_HOSTS}'
+            }, status=403)
+        
+        # Intentionally vulnerable: SSRF
+        validation_params = {'email': email}
+        response = requests.get(validation_url, params=validation_params)
+        
+        # Additional vulnerability: Process HTML content with BeautifulSoup
+        if 'text/html' in response.headers.get('Content-Type', ''):
+            soup = BeautifulSoup(response.text, 'html.parser')
+            # Intentionally process and modify content
+            to_change = soup.find_all(text=re.compile('email'))
+            for element in to_change:
+                fixed_text = element.replace('email', 'EMAIL')
+                element.replace_with(fixed_text)
+            processed_content = str(soup)
+        else:
+            processed_content = response.text
         
         # Intentionally vulnerable: Unsafe save with raw SQL
-        query = f"INSERT INTO email_app_emaillog (to_email, subject, message, status) VALUES ('{email}', 'Validation', 'Validated', 'validated')"
-        EmailLog.objects.raw(query)  # SQL Injection vulnerability
+        query = f"INSERT INTO email_app_emaillog (to_email, subject, message, status) VALUES ('{email}', 'Validation', '{processed_content}', 'validated')"
+        EmailLog.objects.raw(query)
         
-        return JsonResponse(response.json())
+        return JsonResponse({
+            'status': 'success',
+            'validation_result': processed_content,
+            'host_validated': host  # Information disclosure
+        })
+            
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+        # Information disclosure vulnerability (intentionally insecure)
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e),
+            'validation_url': validation_url if 'validation_url' in locals() else None,
+            'parsed_host': host if 'host' in locals() else None
+        }, status=500)
 
 @csrf_exempt
 @require_http_methods(["POST"])
