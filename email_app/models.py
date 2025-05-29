@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.contrib.postgres.fields import JSONField  # For Django 1.8.3
 
 class EmailTemplate(models.Model):
     name = models.CharField(max_length=100)
@@ -29,4 +30,13 @@ class UserEmailSettings(models.Model):
     last_updated = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"{self.user.username}'s email settings" 
+        return f"{self.user.username}'s email settings"
+
+class EmailMetadata(models.Model):
+    email = models.ForeignKey(EmailLog, on_delete=models.CASCADE)
+    metadata = JSONField(default=dict)  # Stores email metadata as JSON
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Metadata for {self.email.subject}" 

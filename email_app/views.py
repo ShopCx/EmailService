@@ -10,7 +10,7 @@ from django.core.mail import send_mail
 from django.conf import settings
 from django.db.models import Q
 from django.contrib.auth.models import User, Group
-from .models import EmailTemplate, EmailLog, UserEmailSettings
+from .models import EmailTemplate, EmailLog, UserEmailSettings, EmailMetadata
 
 # Initialize Redis client
 redis_client = redis.Redis(host='localhost', port=6379, db=1)
@@ -275,4 +275,30 @@ def update_user_permissions(request):
         
         return JsonResponse({'status': 'success'})
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500) 
+        return JsonResponse({'error': str(e)}, status=500)
+
+def search_email_metadata(request):
+    """
+    Vulnerable endpoint that allows SQL injection through JSONField key lookups.
+    The vulnerability exists because user input is directly used as a key in the filter query.
+    """
+    try:
+        # Get the search key and value from request
+        search_key = request.GET.get('key', '')
+        search_value = request.GET.get('value', '')
+
+        # Vulnerable code: Using user input directly in filter query
+        # This allows SQL injection through the key name
+        results = EmailMetadata.objects.filter(**{f"metadata__{search_key}": search_value})
+
+        # Return results
+        return JsonResponse({
+            'status': 'success',
+            'results': list(results.values('email__subject', 'metadata', 'created_at'))
+        })
+    except Exception as e:
+        # Information disclosure vulnerability (intentionally insecure)
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500) 
