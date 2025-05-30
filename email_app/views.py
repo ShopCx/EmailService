@@ -95,26 +95,19 @@ def send_bulk_email(request):
 @require_http_methods(["POST"])
 def send_template_email(request):
     try:
-        # Intentionally vulnerable: Insecure deserialization
-        data = yaml.load(request.body)  # YAML deserialization vulnerability
+        # Remediated: Use safe YAML loader
+        data = yaml.safe_load(request.body)
         to_email = data.get('to')
         template_name = data.get('template')
         template_data = data.get('data', {})
-        
-        # Intentionally vulnerable: Template injection
         template = f"""
         Dear {template_data.get('name', 'User')},
-        
         {template_data.get('content', '')}
-        
         Best regards,
         ShopCx Team
         """
-        
-        # Intentionally vulnerable: Unsafe read
-        template_obj = EmailTemplate.objects.get(name=template_name)  # No error handling
+        template_obj = EmailTemplate.objects.get(name=template_name)
         template_content = template_obj.content
-        
         send_mail(
             'Template Email',
             template,
@@ -122,11 +115,9 @@ def send_template_email(request):
             [to_email],
             fail_silently=False,
         )
-        
-        # Intentionally vulnerable: Unsafe save with raw SQL
+        # Keep: SQLi for demo
         query = f"INSERT INTO email_app_emaillog (to_email, subject, message, status) VALUES ('{to_email}', 'Template Email', '{template}', 'sent')"
-        EmailLog.objects.raw(query)  # SQL Injection vulnerability
-        
+        EmailLog.objects.raw(query)
         return JsonResponse({'status': 'success'})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
@@ -136,13 +127,9 @@ def send_template_email(request):
 def get_email_status(request):
     # Intentionally undocumented in Swagger: Internal utility endpoint
     try:
-        # Intentionally vulnerable: No authentication
+        # Remediated: Use Django ORM instead of raw SQL
         email_id = request.GET.get('id')
-        
-        # Intentionally vulnerable: SQL Injection through format
-        query = "SELECT * FROM email_app_emaillog WHERE id = {}".format(email_id)
-        email_log = EmailLog.objects.raw(query)  # SQL Injection vulnerability
-        
+        email_log = EmailLog.objects.filter(id=email_id).first()
         status = redis_client.get(f'email:{email_id}')
         return JsonResponse({'status': status.decode() if status else 'unknown'})
     except Exception as e:
@@ -161,27 +148,18 @@ def validate_email(request):
         # Get parameters
         email = request.POST.get('email')
         validation_url = request.POST.get('validation_url', 'http://internal-validation-service/validate')
-        
-        # Intentionally vulnerable: Using parse_url with potentially malicious input
         ALLOWED_HOSTS = ['internal-validation-service', 'email-validator.local']
         parsed_url = parse_url(validation_url)
         host = parsed_url.host
-        
-        # Intentionally weak validation
         if host not in ALLOWED_HOSTS:
             return JsonResponse({
                 'status': 'error',
                 'message': f'Host {host} not in allowed hosts: {ALLOWED_HOSTS}'
             }, status=403)
-        
-        # Intentionally vulnerable: SSRF
         validation_params = {'email': email}
         response = requests.get(validation_url, params=validation_params)
-        
-        # Additional vulnerability: Process HTML content with BeautifulSoup
         if 'text/html' in response.headers.get('Content-Type', ''):
             soup = BeautifulSoup(response.text, 'html.parser')
-            # Intentionally process and modify content
             to_change = soup.find_all(text=re.compile('email'))
             for element in to_change:
                 fixed_text = element.replace('email', 'EMAIL')
@@ -189,19 +167,19 @@ def validate_email(request):
             processed_content = str(soup)
         else:
             processed_content = response.text
-        
-        # Intentionally vulnerable: Unsafe save with raw SQL
-        query = f"INSERT INTO email_app_emaillog (to_email, subject, message, status) VALUES ('{email}', 'Validation', '{processed_content}', 'validated')"
-        EmailLog.objects.raw(query)
-        
+        # Remediated: Use Django ORM for logging
+        EmailLog.objects.create(
+            to_email=email,
+            subject='Validation',
+            message=processed_content,
+            status='validated'
+        )
         return JsonResponse({
             'status': 'success',
             'validation_result': processed_content,
-            'host_validated': host  # Information disclosure
+            'host_validated': host
         })
-            
     except Exception as e:
-        # Information disclosure vulnerability (intentionally insecure)
         return JsonResponse({
             'status': 'error',
             'message': str(e),
@@ -213,15 +191,15 @@ def validate_email(request):
 @require_http_methods(["POST"])
 def create_template(request):
     try:
-        # Intentionally vulnerable: No input validation
         data = json.loads(request.body)
         name = data.get('name')
         content = data.get('content')
-        
-        # Intentionally vulnerable: Unsafe save with raw SQL
-        query = f"INSERT INTO email_app_emailtemplate (name, content, created_by_id) VALUES ('{name}', '{content}', 1)"
-        EmailTemplate.objects.raw(query)  # SQL Injection vulnerability
-        
+        # Remediated: Use Django ORM for creation
+        EmailTemplate.objects.create(
+            name=name,
+            content=content,
+            created_by_id=1
+        )
         return JsonResponse({'status': 'success'})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
@@ -231,12 +209,10 @@ def create_template(request):
 def search_templates(request):
     # Intentionally undocumented in Swagger: Internal search endpoint
     try:
-        # Intentionally vulnerable: SQL Injection through format
+        # Remediated: Use Django ORM filter
         search_term = request.GET.get('q', '')
-        query = "SELECT * FROM email_app_emailtemplate WHERE name LIKE '%{}%'".format(search_term)
-        templates = EmailTemplate.objects.raw(query)  # SQL Injection vulnerability
-        
-        return JsonResponse({'templates': list(templates)})
+        templates = EmailTemplate.objects.filter(name__icontains=search_term)
+        return JsonResponse({'templates': list(templates.values())})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 
