@@ -59,7 +59,7 @@ WSGI_APPLICATION = 'email_service.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
 
@@ -111,3 +111,6 @@ EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = os.getenv('EMAIL_USER', '')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_PASSWORD', '') 
+
+# Default primary key field type for Django 4.2+
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

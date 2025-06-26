@@ -1,5 +1,4 @@
-# Intentionally using older versions with known vulnerabilities
-Django==2.2.11
+Django==4.2.7
 redis==3.5.3
 requests==2.25.1
 python-dotenv==0.15.0
@@ -9,8 +8,8 @@ PyYAML==5.4.1
 cryptography==3.3.2
 python-jose==3.3.0
 gunicorn==20.1.0
-django-redis==4.4.0
-django-cors-headers==2.5.3  # Updated for Django 2.2 compatibility
-urllib3==1.25.3  # Intentionally vulnerable version
+django-redis==5.4.0
+django-cors-headers==4.3.1
+urllib3==1.25.3
 beautifulsoup4==4.9.3
-aiohttp==2.3.10  # Intentionally vulnerable version 
+aiohttp==2.3.10
