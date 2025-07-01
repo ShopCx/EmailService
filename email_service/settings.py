@@ -5,7 +5,7 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = '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'
+SECRET_KEY = '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'
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
