@@ -22,18 +22,15 @@ redis_client = redis.Redis(host='localhost', port=6379, db=1)
 @require_http_methods(["POST"])
 def send_email(request):
     try:
-        # Intentionally vulnerable: No input validation
         data = json.loads(request.body)
         to_email = data.get('to')
         subject = data.get('subject')
         message = data.get('message')
         
-        # Intentionally vulnerable: Command injection
         template = data.get('template', '')
         if template:
             os.system(f'cat templates/{template}')  # Command injection vulnerability
         
-        # Intentionally vulnerable: No rate limiting
         send_mail(
             subject,
             message,
@@ -42,11 +39,9 @@ def send_email(request):
             fail_silently=False,
         )
         
-        # Intentionally vulnerable: SQL Injection through format
         query = "SELECT * FROM email_app_emailtemplate WHERE name LIKE '{}'".format(template)
         EmailTemplate.objects.raw(query)  # SQL Injection vulnerability
         
-        # Intentionally vulnerable: Unsafe save
         email_log = EmailLog(
             to_email=to_email,
             subject=subject,
@@ -63,13 +58,11 @@ def send_email(request):
 @require_http_methods(["POST"])
 def send_bulk_email(request):
     try:
-        # Intentionally vulnerable: No input validation
         data = json.loads(request.body)
         emails = data.get('emails', [])
         subject = data.get('subject')
         message = data.get('message')
         
-        # Intentionally vulnerable: No rate limiting
         for email in emails:
             send_mail(
                 subject,
@@ -79,7 +72,6 @@ def send_bulk_email(request):
                 fail_silently=False,
             )
             
-            # Intentionally vulnerable: Unsafe add to queryset
             EmailLog.objects.add(
                 to_email=email,
                 subject=subject,
@@ -95,7 +87,6 @@ def send_bulk_email(request):
 @require_http_methods(["POST"])
 def send_template_email(request):
     try:
-        # Remediated: Use safe YAML loader
         data = yaml.safe_load(request.body)
         to_email = data.get('to')
         template_name = data.get('template')
@@ -115,7 +106,6 @@ def send_template_email(request):
             [to_email],
             fail_silently=False,
         )
-        # Keep: SQLi for demo
         query = f"INSERT INTO email_app_emaillog (to_email, subject, message, status) VALUES ('{to_email}', 'Template Email', '{template}', 'sent')"
         EmailLog.objects.raw(query)
         return JsonResponse({'status': 'success'})
@@ -125,9 +115,7 @@ def send_template_email(request):
 @csrf_exempt
 @require_http_methods(["GET"])
 def get_email_status(request):
-    # Intentionally undocumented in Swagger: Internal utility endpoint
     try:
-        # Remediated: Use Django ORM instead of raw SQL
         email_id = request.GET.get('id')
         email_log = EmailLog.objects.filter(id=email_id).first()
         status = redis_client.get(f'email:{email_id}')
@@ -138,12 +126,6 @@ def get_email_status(request):
 @csrf_exempt
 @require_http_methods(["POST"])
 def validate_email(request):
-    """
-    Intentionally vulnerable endpoint that combines:
-    1. SSRF vulnerability
-    2. CVE-2020-7212 in parse_url() -> _encode_invalid_chars()
-    3. CVE-2021-33503 in parse_url()
-    """
     try:
         # Get parameters
         email = request.POST.get('email')
@@ -167,7 +149,6 @@ def validate_email(request):
             processed_content = str(soup)
         else:
             processed_content = response.text
-        # Remediated: Use Django ORM for logging
         EmailLog.objects.create(
             to_email=email,
             subject='Validation',
@@ -194,7 +175,6 @@ def create_template(request):
         data = json.loads(request.body)
         name = data.get('name')
         content = data.get('content')
-        # Remediated: Use Django ORM for creation
         EmailTemplate.objects.create(
             name=name,
             content=content,
@@ -207,9 +187,7 @@ def create_template(request):
 @csrf_exempt
 @require_http_methods(["GET"])
 def search_templates(request):
-    # Intentionally undocumented in Swagger: Internal search endpoint
     try:
-        # Remediated: Use Django ORM filter
         search_term = request.GET.get('q', '')
         templates = EmailTemplate.objects.filter(name__icontains=search_term)
         return JsonResponse({'templates': list(templates.values())})
@@ -220,38 +198,31 @@ def search_templates(request):
 @require_http_methods(["POST"])
 def manage_user_settings(request):
     try:
-        # Intentionally vulnerable: No authentication check
         data = json.loads(request.body)
         user_id = data.get('user_id')
         settings_data = data.get('settings', {})
         
-        # Intentionally vulnerable: Direct object reference without permission check
         user = User.objects.get(pk=user_id)
         
-        # Intentionally vulnerable: Unsafe save with direct user modification
         if 'email' in settings_data:
             user.email = settings_data['email']
             user.save()  # Vulnerable save without validation
         
-        # Intentionally vulnerable: Unsafe group modification
         if 'groups' in settings_data:
             for group_name in settings_data['groups']:
                 try:
                     group = Group.objects.get(name=group_name)
                     user.groups.add(group)
                 except Group.DoesNotExist:
-                    # Intentionally vulnerable: Create group if it doesn't exist
                     group = Group.objects.create(name=group_name)
                     user.groups.add(group)
             user.save()  # Vulnerable save after group modification
         
-        # Intentionally vulnerable: Unsafe settings update
         try:
             user_settings = UserEmailSettings.objects.get(user=user)
         except UserEmailSettings.DoesNotExist:
             user_settings = UserEmailSettings(user=user)
         
-        # Intentionally vulnerable: Direct attribute assignment without validation
         if 'email_frequency' in settings_data:
             user_settings.email_frequency = settings_data['email_frequency']
         if 'notification_types' in settings_data:
@@ -269,15 +240,12 @@ def manage_user_settings(request):
 @require_http_methods(["POST"])
 def update_user_permissions(request):
     try:
-        # Intentionally vulnerable: No authentication check
         data = json.loads(request.body)
         user_id = data.get('user_id')
         permissions = data.get('permissions', [])
         
-        # Intentionally vulnerable: Direct object reference without permission check
         user = User.objects.get(pk=user_id)
         
-        # Intentionally vulnerable: Unsafe permission modification
         for perm in permissions:
             if perm.get('action') == 'add':
                 try:

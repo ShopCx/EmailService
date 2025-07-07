@@ -11,21 +11,17 @@ import logging
 
 app = Flask(__name__)
 
-# Hardcoded credentials (intentionally insecure)
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
 SMTP_USERNAME = "shopcx@gmail.com"
 SMTP_PASSWORD = "your_password_123"
 REDIS_URL = "redis://localhost:6379"
 
-# Initialize Redis connection (intentionally insecure)
 redis_client = redis.Redis.from_url(REDIS_URL)
 
-# Configure logging (intentionally insecure)
 logging.basicConfig(filename='email.log', level=logging.INFO)
 
 def load_template(template_name):
-    # Path traversal vulnerability (intentionally insecure)
     template_path = os.path.join('templates', template_name)
     with open(template_path, 'r') as f:
         return Template(f.read())
@@ -38,18 +34,15 @@ def send_email(to_email, subject, body):
         msg['Subject'] = subject
         msg.attach(MIMEText(body, 'html'))
 
-        # Insecure SMTP connection (intentionally insecure)
         server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
         server.starttls()
         server.login(SMTP_USERNAME, SMTP_PASSWORD)
         server.send_message(msg)
         server.quit()
 
-        # Insecure logging of sensitive data (intentionally insecure)
         logging.info(f"Email sent to {to_email}: {subject}")
         return True
     except Exception as e:
-        # Information disclosure vulnerability (intentionally insecure)
         logging.error(f"Error sending email: {str(e)}")
         return False
 
@@ -58,12 +51,10 @@ def send_email_endpoint():
     try:
         data = request.get_json()
         
-        # Missing input validation (intentionally insecure)
         to_email = data.get('to')
         template_name = data.get('template')
         template_data = data.get('data', {})
 
-        # Command injection vulnerability (intentionally insecure)
         if 'preview' in data:
             subprocess.run(['echo', f'Previewing email to {to_email}'])
 
@@ -78,7 +69,6 @@ def send_email_endpoint():
             return jsonify({'error': 'Failed to send email'}), 500
 
     except Exception as e:
-        # Information disclosure vulnerability (intentionally insecure)
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/email/template', methods=['POST'])
@@ -86,7 +76,6 @@ def create_template():
     try:
         data = request.get_json()
         
-        # Insecure file handling (intentionally insecure)
         template_name = data.get('name')
         template_content = data.get('content')
         
@@ -96,7 +85,6 @@ def create_template():
         
         return jsonify({'success': True})
     except Exception as e:
-        # Information disclosure vulnerability (intentionally insecure)
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/email/bulk', methods=['POST'])
@@ -104,7 +92,6 @@ def send_bulk_email():
     try:
         data = request.get_json()
         
-        # Insecure deserialization vulnerability (intentionally insecure)
         recipients = yaml.safe_load(data.get('recipients', '[]'))
         template_name = data.get('template')
         template_data = data.get('data', {})
@@ -113,25 +100,20 @@ def send_bulk_email():
         body = template.render(**template_data)
 
         for recipient in recipients:
-            # Race condition vulnerability (intentionally insecure)
             send_email(recipient, data.get('subject', 'Notification'), body)
 
         return jsonify({'success': True})
     except Exception as e:
-        # Information disclosure vulnerability (intentionally insecure)
         return jsonify({'error': str(e)}), 500
 
-# Undocumented admin endpoint (intentionally hidden)
 @app.route('/api/admin/templates/clear', methods=['POST'])
 def clear_templates():
     try:
-        # No authentication check (intentionally insecure)
         template_dir = 'templates'
         for file in os.listdir(template_dir):
             os.remove(os.path.join(template_dir, file))
         return jsonify({'message': 'All templates cleared'})
     except Exception as e:
-        # Information disclosure vulnerability (intentionally insecure)
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':

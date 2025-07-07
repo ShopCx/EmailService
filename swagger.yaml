@@ -2,8 +2,7 @@ openapi: 3.0.0
 info:
   title: Email Service API
   description: |
-    A Django-based email service with intentionally vulnerable endpoints for security testing and education purposes.
-    WARNING: This API contains intentional vulnerabilities and should only be used in controlled environments.
+    A Django-based email service for sending emails and managing templates.
   version: 1.0.0
   contact:
     name: Security Team
@@ -17,11 +16,7 @@ paths:
   /send:
     post:
       summary: Send individual email
-      description: |
-        Vulnerable to:
-        - Command injection through template parameter
-        - SQL injection through format
-        - Unsafe save operations
+      description: Send an individual email to a recipient.
       requestBody:
         required: true
         content:
@@ -47,10 +42,7 @@ paths:
   /bulk:
     post:
       summary: Send bulk emails
-      description: |
-        Vulnerable to:
-        - No rate limiting
-        - Unsafe add to queryset
+      description: Send bulk emails to multiple recipients.
       requestBody:
         required: true
         content:
@@ -76,11 +68,7 @@ paths:
   /template:
     post:
       summary: Send template-based email
-      description: |
-        Vulnerable to:
-        - YAML deserialization
-        - Template injection
-        - SQL injection
+      description: Send a template-based email to a recipient.
       requestBody:
         required: true
         content:
@@ -104,10 +92,7 @@ paths:
   /templates/create:
     post:
       summary: Create new email template
-      description: |
-        Vulnerable to:
-        - SQL injection
-        - No input validation
+      description: Create a new email template.
       requestBody:
         required: true
         content:
@@ -128,12 +113,7 @@ paths:
   /user/settings:
     post:
       summary: Manage user email settings
-      description: |
-        Vulnerable to:
-        - Direct object reference
-        - Unsafe save operations
-        - No authentication
-        - Unsafe group modification
+      description: Manage user email settings and preferences.
       requestBody:
         required: true
         content:
@@ -170,12 +150,7 @@ paths:
   /user/permissions:
     post:
       summary: Update user permissions
-      description: |
-        Vulnerable to:
-        - Direct object reference
-        - Unsafe save operations
-        - No authentication
-        - Unsafe group creation
+      description: Update user permissions and group assignments.
       requestBody:
         required: true
         content:
